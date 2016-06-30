@@ -26,6 +26,7 @@
   (devcards.core/start-devcard-ui!))
 
 
+
 (defn simple-component []
   [:div
    [:p "I am a component!"]
@@ -37,22 +38,18 @@
   (reagent/as-element [simple-component]))
 
 
+
 (defn fblogin []
-  (fb/load-sdk #(println "loaded"))
-  
-  (fb/init {:appId "1337857336279019"
-            :status true
-            :cookies true
-            :xfbml true
-            :version "v2.0"})
-  
   ;; (fb/get-login-status
   ;;  (fn [response]
   ;;    (case (:status response)
   ;;      "connected"
-  ;;      (.log js/console "connected")
-  ;;      ;; else
-  ;;      (fb/login #(.log js/console "else-" %) {:scope "email,user_friends,user_birthday"}))))
+  ;;      (fb/api "/me" {:fields "friends{email}"}
+  ;;              println)
+  ;;     ;; (.log js/console "connected")
+  ;;      ;;else
+  ;;      (fb/login #(.log js/console "else-" (str %)) {:scope "user_friends"})
+  ;;      ))))
 
 
   (fb/ui {:method "share"
@@ -64,11 +61,21 @@
              (js/alert "Post was not published.")))))
 
 
+
+
 (defn facebook []
+  (fb/load-sdk #(println "loaded"))
+  
+  (fb/init {:appId "1337857336279019"
+          :status true
+          :cookies true
+          :xfbml true
+          :version "v2.0"})
+
   [:button.btn.btn-primary {:on-click #(fblogin)} "fblogin"])
 
-(defcard facebook
-   (reagent/as-element [facebook]))
+;; (defcard facebook
+;;    (reagent/as-element [facebook]))
 
 ;;;;;;;;;;;;;;;;;;Gmail;;;;;;;;;;;;;;;;
 
@@ -234,8 +241,8 @@
 
 
 
-(defcard multipleselect
-  (reagent/as-element [multipleselect]))
+;; (defcard multipleselect
+;;   (reagent/as-element [multipleselect]))
 
 ;; (defcard Gmail
 ;;   (reagent/as-element [gmail-login]))
@@ -281,5 +288,111 @@
    ])
 
 
-(defcard linkedin
-  (reagent/as-element [linkedin-login]))
+;; (defcard linkedin
+;;   (reagent/as-element [linkedin-login]))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;hotmail;;;;;;;;;;;;;;;;
+
+
+(defn hotmailinit []
+  (.init js/WL (clj->js
+                {:client_id "0f445520-aaf8-4512-9ee1-9dc76c499ca2"
+                 :redirect_uri "http://localhost:3000"
+                 :scope ["wl.basic" "wl.contacts_emails"]
+                 :response_type "token"
+                 })))
+
+
+(def hotmailemails (atom []))
+
+(defn response1 [response]
+  (let [d (:data (-> response (js->clj :keywordize-keys true)))]
+    (reset! hotmailemails (vec (for [m d] (get-in m [:emails :preferred]))))))
+
+
+(defn response [response]
+  (js/console.log   (str (->  response (js->clj :keywordize-keys true)))))
+
+(defn hotmailapi []
+  (.api js/WL  (clj->js {:path "me/contacts"
+                :method "GET"})
+        response1))
+
+
+(defn hotmail-login []
+  (.login js/WL (clj->js {:scope ["wl.basic" "wl.contacts_emails"]}
+                         )
+         hotmailapi))
+
+
+
+(defn showatom []
+  [:div
+   ;; (filter (fn [x] (not (nil? x))) @hotmailemails)
+   [:p (str @hotmailemails)]
+   ])
+
+;;;chosen for hotmail;;;;
+
+
+(defn add-sendingdata-hot []
+  (reset! sendingdata (js->clj (.val (jquery "#multiselect")))))
+
+(defn multi-select-hot []
+  (do
+  (.trigger (jquery "#multiselect1") "chosen:updated")
+  (.change (.chosen (jquery "#multiselect1"))
+           #(add-sendingdata))
+  (.chosen (jquery "#multiselect1"))))
+
+
+(defn select-email-hot [results]
+  (reagent/create-class
+   {:component-did-mount #(multi-select-hot)
+    :component-will-update #(multi-select-hot)
+    ;;:display-name  "my-component"
+    :reagent-render
+    (fn []
+      [:div
+       [:div.form-group
+        [:div.row
+         [:label.col-sm-3.control-label "Select Email-ids"]
+         [:div.col-sm-4
+          [:select {:id "multiselect1"
+                    :class "chosen-select form-control"
+                    :multiple true}
+           
+           (for [d @results]
+             ^{:key d}
+             [:option {:value d} d])
+           ]]
+         [:div.col-sm-4
+          [:select {:id "select"
+                    :class " form-control"
+                    ;; :multiple true
+                    }
+           (for [d @results]
+             ^{:key d}
+             [:option {:value d} d])
+           ]]]
+        ]])}))
+
+
+
+
+(defn hotmail []
+  (hotmailinit)
+  [:div
+   [:button.btn.btn-primary
+    {:on-click #(hotmail-login)}
+    "hotmail-login"]
+   [showatom]
+   [select-email-hot hotmailemails]
+   ])
+
+
+
+ (defcard hotmail-login
+   (reagent/as-element [hotmail]))
+
+
